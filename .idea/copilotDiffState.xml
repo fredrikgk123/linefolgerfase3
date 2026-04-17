@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CopilotDiffPersistence">
+    <option name="pendingDiffs">
+      <map>
+        <entry key="/platformio (snapshot).ini">
+          <value>
+            <PendingDiffInfo>
+              <option name="filePath" value="/platformio (snapshot).ini" />
+              <option name="originalContent" value="[env:esp32doit-devkit-v1]&#10;platform = espressif32&#10;board = esp32doit-devkit-v1&#10;framework = arduino&#10;lib_deps =&#10;    pololu/QTRSensors @ ^4.0.0&#10;&#10;upload_speed = 921600&#10;monitor_speed = 115200&#10;monitor_port = COM3&#10;monitor_filters =&#10;    default&#10;    time" />
+              <option name="updatedContent" value="[env:esp32doit-devkit-v1]&#10;platform = espressif32&#10;board = esp32doit-devkit-v1&#10;framework = arduino&#10;lib_deps =&#10;    pololu/QTRSensors @ ^4.0.0&#10;&#10;upload_port = COM3&#10;upload_speed = 921600&#10;monitor_speed = 115200&#10;monitor_port = COM3&#10;monitor_filters =&#10;    default&#10;    time" />
+            </PendingDiffInfo>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>
