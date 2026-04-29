@@ -61,9 +61,9 @@ String RobotWifi::buildPage() {
 
     p += "<hr><h3>PID</h3>";
     p += "<form action='/set'>";
-    p += "Kp: <input name='kp' type='number' step='0.001' value='" + String(kp, 4) + "'><br><br>";
-    p += "Ki: <input name='ki' type='number' step='0.0001' value='" + String(ki, 4) + "'><br><br>";
-    p += "Kd: <input name='kd' type='number' step='0.001' value='" + String(kd, 4) + "'><br><br>";
+    p += "Kp: <input name='kp' type='number' step='0.0001' value='" + String(kp, 5) + "'><br><br>";
+    p += "Ki: <input name='ki' type='number' step='0.00001' value='" + String(ki, 5) + "'><br><br>";
+    p += "Kd: <input name='kd' type='number' step='0.00001' value='" + String(kd, 5) + "'><br><br>";
     p += "<input type='submit' value='Oppdater PID'></form>";
 
     p += "<script>"
@@ -127,7 +127,7 @@ void RobotWifi::setupRoutes() {
         if (server.hasArg("ki"))   ki = server.arg("ki").toFloat();
         if (server.hasArg("kd"))   kd = server.arg("kd").toFloat();
 
-        Serial.printf("Base:%d Reg:%d Kp:%.4f Ki:%.4f Kd:%.4f\n",
+        Serial.printf("Base:%d Reg:%d Kp:%.5f Ki:%.5f Kd:%.5f\n",
                       baseSpeed, regSpeed, kp, ki, kd);
 
         server.sendHeader("Location", "/");
@@ -169,7 +169,7 @@ void RobotWifi::setupRoutes() {
             float t_s = s.t_ms / 1000.0f;
             snprintf(line, sizeof(line), "%.3f,%d,%d\n", t_s, s.error, s.correction);
             server.sendContent(line);
-            if ((i & 0x1F) == 0) yield();  // gi CPU tid kvart 32. linje
+            if ((i & 0x1F) == 0) yield();
         }
         server.client().stop();
         Serial.printf("CSV lastet ned (%u samples)\n", total);
