@@ -39,7 +39,7 @@ void setup() {
     wifi.begin();
 
     digitalWrite(LED_PIN, HIGH);
-    Serial.println("Klar! Koble til WiFi: LinjefølgerG11 / 12345678");
+    Serial.println("Klar! Koble til WiFi: LinjefolgerG11 / 12345678");
 }
 
 void loop() {
@@ -68,6 +68,31 @@ void loop() {
     // Les posisjon
     uint16_t pos = sensor.readPosition();
 
+    // Sjekk om linja er tapt - kun trigger ved 90-graders svinger
+    // Krever at ALLE sensorene er under terskelen samtidig
+    bool lineLost = true;
+    for (uint8_t i = 0; i < Sensor::COUNT; i++) {
+        if (sensor.values[i] > 800) { lineLost = false; break; }
+    }
+
+    if (lineLost) {
+        // Nullstill integral så den ikke hopper når linja gjenfinnes
+        integral = 0.0f;
+        lastTime = millis();
+
+        // Bruk siste kjente feil til å snu riktig vei
+        if (lastError > 0) {
+            // Linja var til venstre -> snu venstre
+            motors.setLeft(-baseSpeed / 2);
+            motors.setRight(baseSpeed / 2);
+        } else {
+            // Linja var til hoyre -> snu hoyre
+            motors.setLeft(baseSpeed / 2);
+            motors.setRight(-baseSpeed / 2);
+        }
+        return;
+    }
+
     // PID
     float error = (float)sensor.CENTER - (float)pos;
 
@@ -85,8 +110,8 @@ void loop() {
     float correction = kp * error + ki * integral + kd * derivative;
     int corr = (int)constrain(correction, -regSpeed, regSpeed);
 
-    int leftSpeed  = baseSpeed + corr;
-    int rightSpeed = baseSpeed - corr;
+    int leftSpeed  = baseSpeed - corr;
+    int rightSpeed = baseSpeed + corr;
 
     leftSpeed  = constrain(leftSpeed,  -255, 255);
     rightSpeed = constrain(rightSpeed, -255, 255);
@@ -105,7 +130,7 @@ void loop() {
         encoder.getRightRPM()
     );
 
-    // Debug — kun kvart 100 ms for å ikkje bremse loopen
+    // Debug - kun kvart 100 ms for aa ikkje bremse loopen
     static unsigned long lastPrint = 0;
     if (now - lastPrint >= 100) {
         lastPrint = now;
