@@ -8,12 +8,23 @@
 #define LED_PIN   2
 
 // ======= TUNING =======
-int   baseSpeed    = 120;
+int   baseSpeed    = 120;     // fart i svinger
+int   maxSpeed     = 140;     // fart paa rettstrekning
 int   regSpeed     = 255;
 float kp           = 0.0477f;
 float ki           = 0.0f;
 float kd           = 0.0010f;
 bool  running      = false;
+
+// ======= TILSTANDSMASKIN =======
+enum State { STATE_CURVE, STATE_STRAIGHT };
+State currentState = STATE_CURVE;
+
+// Terskler
+const float STRAIGHT_ERROR_THRESHOLD = 400.0f;   // |err| under = rett
+const float CURVE_ERROR_THRESHOLD    = 800.0f;   // |err| over  = sving
+const int   STRAIGHT_SAMPLES_NEEDED  = 10;       // ~100 ms med liten feil
+int straightCounter = 0;
 
 // ======= OBJEKTER =======
 Motors    motors;
@@ -47,6 +58,8 @@ void loop() {
     if (!running) {
         motors.stop();
         wasRunning = false;
+        currentState = STATE_CURVE;
+        straightCounter = 0;
         return;
     }
 
@@ -56,6 +69,8 @@ void loop() {
         lastError = 0.0f;
         lastTime = millis();
         wasRunning = true;
+        currentState = STATE_CURVE;
+        straightCounter = 0;
     }
 
     // Les posisjon
@@ -78,8 +93,36 @@ void loop() {
     float correction = kp * error + ki * integral + kd * derivative;
     int corr = (int)constrain(correction, -regSpeed, regSpeed);
 
-    int leftSpeed  = baseSpeed + corr;
-    int rightSpeed = baseSpeed - corr;
+    // ===== TILSTANDSMASKIN =====
+    float absError = fabs(error);
+
+    switch (currentState) {
+        case STATE_CURVE:
+            // Sjekk om vi er paa rettstrekning
+            if (absError < STRAIGHT_ERROR_THRESHOLD) {
+                straightCounter++;
+                if (straightCounter >= STRAIGHT_SAMPLES_NEEDED) {
+                    currentState = STATE_STRAIGHT;
+                }
+            } else {
+                straightCounter = 0;
+            }
+            break;
+
+        case STATE_STRAIGHT:
+            // Hvis feilen oker -> tilbake til CURVE umiddelbart
+            if (absError > CURVE_ERROR_THRESHOLD) {
+                currentState = STATE_CURVE;
+                straightCounter = 0;
+            }
+            break;
+    }
+
+    // Velg fart basert paa tilstand
+    int targetSpeed = (currentState == STATE_STRAIGHT) ? maxSpeed : baseSpeed;
+
+    int leftSpeed  = targetSpeed + corr;
+    int rightSpeed = targetSpeed - corr;
 
     leftSpeed  = constrain(leftSpeed,  -255, 255);
     rightSpeed = constrain(rightSpeed, -255, 255);
@@ -90,12 +133,15 @@ void loop() {
     // ===== LOGGER =====
     logger.record((int16_t)error, (int16_t)corr);
 
-    // Debug — kun kvar 100 ms for å ikkje bremse loopen
+    // Debug - kvart 100 ms
     static unsigned long lastPrint = 0;
     if (now - lastPrint >= 100) {
         lastPrint = now;
+        const char* stateStr = (currentState == STATE_STRAIGHT) ? "STR" : "CRV";
+        Serial.print("["); Serial.print(stateStr); Serial.print("] ");
         Serial.print("Pos: "); Serial.print(pos);
         Serial.print(" | Err: "); Serial.print(error);
-        Serial.print(" | Corr: "); Serial.println(corr);
+        Serial.print(" | Corr: "); Serial.print(corr);
+        Serial.print(" | Spd: "); Serial.println(targetSpeed);
     }
 }
