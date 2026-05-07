@@ -8,11 +8,11 @@
 #define LED_PIN   2
 
 // ======= TUNING =======
-int   baseSpeed    = 100;
-int   regSpeed     = 200;
-float kp           = 0.05f;
+int   baseSpeed    = 120;
+int   regSpeed     = 255;
+float kp           = 0.0477f;
 float ki           = 0.0f;
-float kd           = 0.3f;
+float kd           = 0.0010f;
 bool  running      = false;
 
 // ======= OBJEKTER =======
