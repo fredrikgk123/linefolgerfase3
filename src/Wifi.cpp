@@ -34,10 +34,17 @@ String RobotWifi::buildPage() {
     p += "<p>Status: <b id='status'>" + String(running ? "KJORER" : "STOPPET") + "</b></p>";
     p += "<p>Kalibrering: <b id='kal'>" + String(calibrating ? "PAGAR..." : (sensor.isCalibrated() ? "FERDIG" : "IKKE KALIBRERT")) + "</b></p>";
 
+    bool diaOn = (diamondEnabled && *diamondEnabled);
+    p += "<p>Diamant-deteksjon: <b id='dia'>" + String(diaOn ? "PAA" : "AV") + "</b></p>";
+
     p += "<p>";
     p += "<button onclick='fetch(\"/start\")' style='padding:10px 20px;font-size:16px;margin:4px'>START</button> ";
     p += "<button onclick='fetch(\"/stopp\")' style='padding:10px 20px;font-size:16px;margin:4px'>STOPP</button> ";
     p += "<button onclick='fetch(\"/kalibrer\")' style='padding:10px 20px;font-size:16px;margin:4px'>KALIBRER</button>";
+    p += "</p>";
+
+    p += "<p>";
+    p += "<button onclick='fetch(\"/diamond/toggle\")' style='padding:10px 20px;font-size:16px;margin:4px;background:#2196f3;color:white;border:none;border-radius:4px'>Toggle diamant</button>";
     p += "</p><hr>";
 
     // ========== DATALOGGER ==========
@@ -73,6 +80,7 @@ String RobotWifi::buildPage() {
          "    const s=await r.json();"
          "    document.getElementById('status').textContent=s.running?'KJORER':'STOPPET';"
          "    document.getElementById('kal').textContent=s.calibrating?'PAGAR...':s.calibrated?'FERDIG':'IKKE KALIBRERT';"
+         "    document.getElementById('dia').textContent=s.diamond?'PAA':'AV';"
          "    document.getElementById('logcount').textContent=s.logcount+'/'+s.logcap;"
          "    document.getElementById('logstate').textContent=s.logging?'LOGGER':'STOPPET';"
          "  }catch(e){}"
@@ -87,9 +95,11 @@ String RobotWifi::buildPage() {
 void RobotWifi::setupRoutes() {
 
     server.on("/status", HTTP_GET, [this]() {
+        bool diaOn = (diamondEnabled && *diamondEnabled);
         String json = "{\"running\":" + String(running ? "true" : "false") + ",";
         json += "\"calibrating\":" + String(calibrating ? "true" : "false") + ",";
         json += "\"calibrated\":" + String(sensor.isCalibrated() ? "true" : "false") + ",";
+        json += "\"diamond\":" + String(diaOn ? "true" : "false") + ",";
         json += "\"logging\":" + String(logger.isLogging() ? "true" : "false") + ",";
         json += "\"logcount\":" + String(logger.count()) + ",";
         json += "\"logcap\":" + String(logger.capacity()) + "}";
@@ -116,8 +126,29 @@ void RobotWifi::setupRoutes() {
         running = false;
         calibrating = true;
         server.send(200, "text/plain", "Kalibrerer...");
-        sensor.calibrate(5000);
+        sensor.calibrate(4000);
         calibrating = false;
+    });
+
+    // ========== DIAMANT-TOGGLE ==========
+    server.on("/diamond/toggle", HTTP_GET, [this]() {
+        if (diamondEnabled) {
+            *diamondEnabled = !(*diamondEnabled);
+            Serial.printf("Diamant-deteksjon: %s\n", *diamondEnabled ? "PAA" : "AV");
+        }
+        server.send(200, "text/plain", "OK");
+    });
+
+    server.on("/diamond/on", HTTP_GET, [this]() {
+        if (diamondEnabled) *diamondEnabled = true;
+        Serial.println("Diamant-deteksjon: PAA");
+        server.send(200, "text/plain", "OK");
+    });
+
+    server.on("/diamond/off", HTTP_GET, [this]() {
+        if (diamondEnabled) *diamondEnabled = false;
+        Serial.println("Diamant-deteksjon: AV");
+        server.send(200, "text/plain", "OK");
     });
 
     server.on("/set", HTTP_GET, [this]() {
