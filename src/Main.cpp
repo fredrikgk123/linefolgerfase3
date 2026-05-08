@@ -10,10 +10,14 @@
 // ======= TUNING =======
 int   baseSpeed    = 100;
 int   regSpeed     = 200;
-float kp           = 0.05f;
+float kp           = 0.0477f;
 float ki           = 0.0f;
-float kd           = 0.3f;
+float kd           = 0.001f;
 bool  running      = false;
+
+// ======= STRAIGHT BOOST =======
+const int   STRAIGHT_SPEED    = 130;
+const float STRAIGHT_THRESHOLD = 200.0f;   // justér etter behov
 
 // ======= OBJEKTER =======
 Motors    motors;
@@ -36,7 +40,6 @@ void setup() {
     wifi.begin();
 
     digitalWrite(LED_PIN, HIGH);
-    Serial.println("Klar! Koble til WiFi: LinjefølgerG11 / 12345678");
 }
 
 void loop() {
@@ -50,19 +53,15 @@ void loop() {
         return;
     }
 
-    // Rising edge: just started
     if (!wasRunning) {
-        integral = 0.0f;
+        integral  = 0.0f;
         lastError = 0.0f;
-        lastTime = millis();
+        lastTime  = millis();
         wasRunning = true;
     }
 
-    // Les posisjon
-    uint16_t pos = sensor.readPosition();
-
-    // PID
-    float error = (float)sensor.CENTER - (float)pos;
+    uint16_t pos   = sensor.readPosition();
+    float    error = (float)sensor.CENTER - (float)pos;
 
     unsigned long now = millis();
     float dt = (now - lastTime) / 1000.0f;
@@ -70,7 +69,7 @@ void loop() {
     lastTime = now;
 
     integral += error * dt;
-    integral = constrain(integral, -1000.0f, 1000.0f);
+    integral  = constrain(integral, -1000.0f, 1000.0f);
 
     float derivative = (error - lastError) / dt;
     lastError = error;
@@ -78,8 +77,11 @@ void loop() {
     float correction = kp * error + ki * integral + kd * derivative;
     int corr = (int)constrain(correction, -regSpeed, regSpeed);
 
-    int leftSpeed  = baseSpeed + corr;
-    int rightSpeed = baseSpeed - corr;
+    // Bruk høyere hastighet når roboten kjører rett frem
+    int effective = (fabsf(error) < STRAIGHT_THRESHOLD) ? STRAIGHT_SPEED : baseSpeed;
+
+    int leftSpeed  = effective + corr;
+    int rightSpeed = effective - corr;
 
     leftSpeed  = constrain(leftSpeed,  -255, 255);
     rightSpeed = constrain(rightSpeed, -255, 255);
@@ -87,15 +89,5 @@ void loop() {
     motors.setLeft(leftSpeed);
     motors.setRight(rightSpeed);
 
-    // ===== LOGGER =====
     logger.record((int16_t)error, (int16_t)corr);
-
-    // Debug — kun kvar 100 ms for å ikkje bremse loopen
-    static unsigned long lastPrint = 0;
-    if (now - lastPrint >= 100) {
-        lastPrint = now;
-        Serial.print("Pos: "); Serial.print(pos);
-        Serial.print(" | Err: "); Serial.print(error);
-        Serial.print(" | Corr: "); Serial.println(corr);
-    }
 }
