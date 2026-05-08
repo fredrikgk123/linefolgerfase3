@@ -9,7 +9,7 @@
 
 // ======= TUNING =======
 int   baseSpeed    = 120;     // fart i svinger
-int   maxSpeed     = 140;     // fart paa rettstrekning
+int   maxSpeed     = 145;     // fart paa rettstrekning
 int   regSpeed     = 255;
 float kp           = 0.0477f;
 float ki           = 0.0f;
