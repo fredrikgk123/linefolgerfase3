@@ -4,6 +4,7 @@
 #include "Wifi.hpp"
 #include "Logger.hpp"
 #include "Encoder.hpp"
+#include "PID.hpp"
 
 // ======= PIN CONFIG =======
 #define LED_PIN   2
@@ -21,12 +22,8 @@ Motors    motors;
 Sensor    sensor;
 Logger    logger;
 Encoder   encoder;
+PIDController pid(kp, ki, kd);
 RobotWifi wifi(running, baseSpeed, regSpeed, kp, ki, kd, sensor, logger);
-
-// ======= PID STATE =======
-float lastError  = 0.0f;
-float integral   = 0.0f;
-unsigned long lastTime = 0;
 
 void setup() {
     Serial.begin(115200);
@@ -37,6 +34,7 @@ void setup() {
     sensor.begin();
     encoder.begin();
     wifi.begin();
+    pid.begin();
 
     digitalWrite(LED_PIN, HIGH);
     Serial.println("Klar! Koble til WiFi: LinjefolgerG11 / 12345678");
@@ -48,22 +46,19 @@ void loop() {
     // Oppdater RPM-beregning kontinuerlig
     encoder.update();
 
-    static bool wasRunning = false;
-
     if (!running) {
         motors.stop();
-        wasRunning = false;
         return;
     }
 
-    // Rising edge: just started
+    // Når roboten startes, nullstill PID
+    static bool wasRunning = false;
     if (!wasRunning) {
-        integral  = 0.0f;
-        lastError = 0.0f;
-        lastTime  = millis();
+        pid.reset();
         encoder.resetPulses();
         wasRunning = true;
     }
+    if (!running) wasRunning = false;
 
     // Les posisjon
     uint16_t pos = sensor.readPosition();
@@ -76,38 +71,26 @@ void loop() {
     }
 
     if (lineLost) {
-        // Nullstill integral så den ikke hopper når linja gjenfinnes
-        integral = 0.0f;
-        lastTime = millis();
+        // Nullstill PID når linja går tapt
+        pid.reset();
 
         // Bruk siste kjente feil til å snu riktig vei
+        float lastError = pid.getLastDerivative() > 0 ? 1.0f : -1.0f;
         if (lastError > 0) {
             // Linja var til venstre -> snu venstre
             motors.setLeft(-baseSpeed / 2);
             motors.setRight(baseSpeed / 2);
         } else {
-            // Linja var til hoyre -> snu hoyre
+            // Linja var til høyre -> snu høyre
             motors.setLeft(baseSpeed / 2);
             motors.setRight(-baseSpeed / 2);
         }
         return;
     }
 
-    // PID
+    // PID - Beregn korrigering
     float error = (float)sensor.CENTER - (float)pos;
-
-    unsigned long now = millis();
-    float dt = (now - lastTime) / 1000.0f;
-    if (dt <= 0.0f) dt = 0.001f;
-    lastTime = now;
-
-    integral += error * dt;
-    integral = constrain(integral, -1000.0f, 1000.0f);
-
-    float derivative = (error - lastError) / dt;
-    lastError = error;
-
-    float correction = kp * error + ki * integral + kd * derivative;
+    float correction = pid.calculate(error);
     int corr = (int)constrain(correction, -regSpeed, regSpeed);
 
     int leftSpeed  = baseSpeed - corr;
@@ -132,6 +115,7 @@ void loop() {
 
     // Debug - kun kvart 100 ms for aa ikkje bremse loopen
     static unsigned long lastPrint = 0;
+    unsigned long now = millis();
     if (now - lastPrint >= 100) {
         lastPrint = now;
         Serial.printf("Pos:%u | Err:%.0f | Corr:%d | L_RPM:%.0f | R_RPM:%.0f\n",
